@@ -71,7 +71,7 @@ func main() {
 	} else {
 		fmt.Printf("%d runners\n", len(runs.Runners))
 		for _, r := range runs.Runners {
-			fmt.Printf("runner: %#v\n", r)
+			fmt.Printf("runner: %#v\n", *r.Name)
 		}
 	}
 
@@ -101,7 +101,7 @@ func installRunner(ctx context.Context, conn *repo) (string, error) {
 	}
 	for _, dl := range dls {
 		if *dl.OS == "linux" && *dl.Architecture == "x64" {
-			fmt.Printf("dl: %#v\n", dl)
+			fmt.Printf("dl: %#v\n", *dl.Filename)
 			return unpackRunner(*dl.DownloadURL, *flagRunnerDir)
 		}
 	}

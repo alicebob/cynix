@@ -1,4 +1,5 @@
 name: CI
+in: [push]
 jobs:
   build:
     steps:
