@@ -6,3 +6,4 @@ tidy:
 
 ci:	
 	echo hi there
+	make -C proj ci

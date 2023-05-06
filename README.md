@@ -14,3 +14,8 @@ Permissions -> Repository Permissions -> Actions -> R/W
 
 https://docs.github.com/en/actions/hosting-your-own-runners
 https://pkg.go.dev/github.com/google/go-github/v52/github#ActionsService.GetRunner
+
+## nix part
+	nix-channel --add https://nixos.org/channels/nixos-22.11 nixpkgs
+	nix-channel --update
+
