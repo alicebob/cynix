@@ -1,7 +1,8 @@
 test:
-	nix-shell --run "go test"
+	go test
 
 build:
-	nix-shell --run "go build"
+	go build
 
-ci: test build
+ci:
+	nix-shell --run "make test build"
