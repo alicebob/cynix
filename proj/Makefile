@@ -1,7 +1,7 @@
 test:
-	go test
+	nix-shell --run "go test"
 
 build:
-	go build
+	nix-shell --run "go build"
 
 ci: test build
