@@ -5,4 +5,4 @@ build:
 	go build
 
 ci:
-	nix-shell --run "make test build"
+	/usr/bin/nix-shell --run "make test build"
