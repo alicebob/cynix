@@ -4,7 +4,7 @@ COPY go.mod go.sum main.go ./
 RUN go build -o cynix
 
 FROM debian:stable-slim
-RUN DEBIAN_FRONTEND=noninteractive apt update -y && apt -y install --no-install-recommends ca-certificates xz-utils curl \
+RUN DEBIAN_FRONTEND=noninteractive apt update -y && apt -y install --no-install-recommends ca-certificates xz-utils curl make \
 	libkrb5-3 zlib1g liblttng-ust0 libssl1.1 libicu67
 
 RUN mkdir -p /etc/nix
