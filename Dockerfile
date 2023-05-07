@@ -1,7 +1,7 @@
 FROM golang:1.20 as builder
 WORKDIR /build
 COPY go.mod go.sum main.go ./
-RUN go build -o cynix
+RUN CGO_ENABLED=0 go build -o cynix
 
 FROM nixos/nix
 WORKDIR /
