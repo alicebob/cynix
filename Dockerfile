@@ -26,5 +26,5 @@ RUN	. .nix-profile/etc/profile.d/nix.sh && nix-channel --update
 # this might preinstall: RUN nix-build -A pythonFull '<nixpkgs>'
 
 COPY --from=0 /build/cynix .
-COPY /run.sh .
+COPY run.sh .
 ENTRYPOINT /home/cynix/run.sh
