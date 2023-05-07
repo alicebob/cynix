@@ -9,4 +9,4 @@ COPY /run.sh /
 RUN	nix-channel --add https://nixos.org/channels/nixos-22.11 nixpkgs
 RUN	nix-channel --update
 # this might preinstall: RUN nix-build -A pythonFull '<nixpkgs>'
-COMMAND /run.sh
+ENTRYPOINT /run.sh
