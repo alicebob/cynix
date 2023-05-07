@@ -6,4 +6,4 @@ tidy:
 
 ci:	
 	echo hi there
-	make -C proj ci
+	nix-shell --run "make build"
