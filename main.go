@@ -10,7 +10,10 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"strings"
+	"sync"
+	"syscall"
 
 	"github.com/google/go-github/v52/github"
 	"golang.org/x/oauth2"
@@ -20,7 +23,7 @@ var (
 	flagOwner     = flag.String("owner", "alicebob", "repository owner")
 	flagRepo      = flag.String("repo", "cynix", "repository name")
 	flagPAT       = flag.String("pat", "", "personal access token")
-	flagName      = flag.String("name", "cynix", "runner name")
+	flagName      = flag.String("name", "cynix", "runner name")                   // unique
 	flagRunnerDir = flag.String("dir", "./runner/", "runner dir (will be wiped)") // needs trailing /
 )
 
@@ -37,7 +40,7 @@ func (r repo) URL() string {
 
 func main() {
 	flag.Parse()
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
 	log.Printf("using repo %s/%s", *flagOwner, *flagRepo)
 	resetRunner(*flagRunnerDir)
 
@@ -53,7 +56,9 @@ func main() {
 		Repo:   *flagRepo,
 	}
 
-	runs, _, err := client.Actions.ListRunners(ctx, *flagOwner, *flagRepo, nil)
+	// mostly to test the connection.
+	// (but we could make our runner's name unique...)
+	runs, _, err := conn.Client.Actions.ListRunners(ctx, *flagOwner, *flagRepo, nil)
 	if err != nil {
 		log.Fatalf("list runners: %s", err)
 	}
@@ -62,30 +67,56 @@ func main() {
 		log.Printf(" - runner: %#v", *r.Name)
 	}
 
-	tok, _, err := client.Actions.CreateRegistrationToken(ctx, *flagOwner, *flagRepo)
-	if err != nil {
-		log.Fatalf("create token: %s", err)
-	}
-	regToken := *tok.Token
-	log.Printf("got registration token")
-
 	if err := installRunner(ctx, conn, *flagRunnerDir); err != nil {
 		log.Fatalf("install runner: %s", err)
 	}
 
-	var (
-		configExe = *flagRunnerDir + "config.sh"
-		runExe    = *flagRunnerDir + "run.sh"
+	if err := setupRunner(ctx, conn, *flagRunnerDir, *flagName); err != nil {
+		log.Fatalf("setup runner: %s", err)
+	}
+
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		if err := runRunner(ctx, *flagRunnerDir+"run.sh"); err != nil {
+			log.Printf("runner: %s", err)
+		}
+		wg.Done()
+	}()
+
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	signal.Notify(c, syscall.SIGTERM)
+	<-c
+
+	log.Printf("shutting down...")
+	cancel()
+	wg.Wait()
+
+	if err := unregisterRunner(context.Background(), conn, *flagRunnerDir+"config.sh", *flagName); err != nil {
+		log.Printf("unreg runner: %s -- cleanup manually", err)
+	}
+}
+
+func setupRunner(ctx context.Context, conn *repo, dir string, runnerName string) error {
+	res, _, err := conn.Client.Actions.CreateRegistrationToken(ctx, conn.Owner, conn.Repo)
+	if err != nil {
+		return fmt.Errorf("create token: %w", err)
+	}
+	token := *res.Token
+	log.Printf("got registration token")
+
+	exe := *flagRunnerDir + "config.sh"
+	cmd := exec.Command(exe,
+		"--token", token,
+		"--url", conn.URL(),
+		"--name", runnerName,
+		"--unattended",
+		"--disableupdate",
 	)
-
-	if err := configRunner(configExe, conn.URL(), regToken, *flagName); err != nil {
-		log.Fatalf("config: %s", err)
-	}
-	log.Printf("runner configured")
-
-	if err := runRunner(ctx, runExe); err != nil {
-		log.Printf("runner: %s", err)
-	}
+	cmd.Stdout = &pw{pre: "config stdout"}
+	cmd.Stderr = &pw{pre: "config stderr"}
+	return cmd.Run()
 }
 
 // download + untar runner binary
@@ -137,23 +168,30 @@ func unpackRunner(downloadURL, dir string) error {
 	return nil
 }
 
-func configRunner(exe, repoURL, token, name string) error {
-	cmd := exec.Command(exe,
-		"--token", token,
-		"--url", repoURL,
-		"--name", name,
-		"--unattended",
-		"--disableupdate",
-	)
-	cmd.Stdout = &pw{pre: "config stdout"}
-	cmd.Stderr = &pw{pre: "config stderr"}
-	return cmd.Run()
-}
-
 func runRunner(ctx context.Context, exe string) error {
 	cmd := exec.CommandContext(ctx, exe)
 	cmd.Stdout = &pw{pre: "runner stdout"}
 	cmd.Stderr = &pw{pre: "runner stderr"}
+	return cmd.Run()
+}
+
+func unregisterRunner(ctx context.Context, conn *repo, configExe string, runnerName string) error {
+	res, _, err := conn.Client.Actions.CreateRemoveToken(ctx, conn.Owner, conn.Repo)
+	if err != nil {
+		return fmt.Errorf("remove token: %w", err)
+	}
+	token := *res.Token
+	log.Printf("got remove token")
+
+	cmd := exec.CommandContext(ctx, configExe,
+		"remove",
+		"--token", token,
+		"--url", conn.URL(),
+		"--name", runnerName,
+		"--unattended",
+	)
+	cmd.Stdout = &pw{pre: "remove stdout"}
+	cmd.Stderr = &pw{pre: "remove stderr"}
 	return cmd.Run()
 }
 
