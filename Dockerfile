@@ -6,6 +6,7 @@ RUN go build -o cynix
 ## Copied from https://hub.docker.com/r/nixos/nix/dockerfile/
 FROM debian:stable-slim
 RUN apt update -y
+RUN apt -y install --no-install-recommends wget
 
 # Download Nix and install it into the system.
 ARG NIX_VERSION=2.3.14
